@@ -45,6 +45,13 @@ wails dev          # hot-reload dev mode
 wails build        # produces wattprint.exe in build/bin/
 ```
 
+**On Linux/WSL Ubuntu 24.04+**, webkit2gtk-4.0 isn't available — Wails needs the `webkit2_41` build tag:
+
+```sh
+wails dev -tags webkit2_41
+wails build -tags webkit2_41
+```
+
 The single `.exe` is portable — no installer required.
 
 ### WSL / Linux dev
