@@ -1,24 +1,24 @@
-build/bin
-node_modules
-frontend/dist
-frontend/node_modules
-
-# Editor
+node_modules/
+out/
+dist/
+*.log
+.DS_Store
+Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea
-*.swp
+*.local
+.env
+.env.*
 
 # OS
 .DS_Store
-Thumbs.db
 
-# Go
-*.test
-*.out
-coverage.*
+# Wattprint runtime data (do not commit)
+*.db
+*.db-shm
+*.db-wal
 
-# Local config (don't commit personal settings.json)
-wattprint.db
-wattprint.db-shm
-wattprint.db-wal
+# Build output
+out/
+release/

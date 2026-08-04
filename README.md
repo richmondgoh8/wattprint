@@ -2,15 +2,15 @@
 
 > **See exactly how much electricity every app on your PC uses — in real time, in watts, dollars, and carbon.**
 
-Real-time per-app and per-component power monitoring for Windows. Local-first, MIT licensed, open source.
+Real-time per-app and per-component power monitoring. Local-first, MIT licensed, open source.
 
 ![GitHub release](https://img.shields.io/github/v/release/richmondgoh8/wattprint)
 ![License](https://img.shields.io/github/license/richmondgoh8/wattprint)
-![Platform](https://img.shields.io/badge/platform-Windows-0078d4)
+![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
 
 ## Why
 
-Most people don't know how much electricity their PC actually uses, or which apps are silently draining power. Wattprint makes it visible — broken down by app and by hardware component — and projects your monthly bill before you get it.
+Most people don't know how much electricity their computer actually uses, or which apps are silently draining power. Wattprint makes it visible — broken down by app and by hardware component — and projects your monthly bill before you get it.
 
 ## What it does
 
@@ -24,78 +24,52 @@ All data stays on your machine. No cloud, no telemetry, no tracking.
 
 ## Stack
 
-- [Wails v2](https://wails.io) — Go backend, native webview frontend
+- [Electron](https://electronjs.org) — cross-platform desktop runtime
+- [electron-vite](https://electron-vite.org) — single-config build for main + preload + renderer
 - [Svelte 5](https://svelte.dev) + TypeScript + Vite
 - [uPlot](https://github.com/leeoniya/uPlot) — live charts
-- [gopsutil](https://github.com/shirou/gopsutil) — system metrics
-- [modernc.org/sqlite](https://pkg.go.dev/modernc.org/sqlite) — pure-Go SQLite (no CGO, no DLL hell)
+- [systeminformation](https://github.com/sebhildebrandt/systeminformation) — system metrics
+- [better-sqlite3](https://github.com/WiseLibs/better-sqlite3) — embedded SQLite
+- [electron-store](https://github.com/sindresorhus/electron-store) — user settings
 
 ## Quick start
 
 ### Requirements
-- Go 1.23+
 - Node.js 20+
-- Wails CLI v2.13+
+- npm 10+
+- Build tools for native modules (gcc, python3, make)
 
 ```sh
-go install github.com/wailsapp/wails/v2/cmd/wails@latest
 git clone https://github.com/richmondgoh8/wattprint
 cd wattprint
-wails dev          # hot-reload dev mode
-wails build        # produces wattprint.exe in build/bin/
+npm install
+npm run dev          # hot-reload dev mode
+npm run build:win    # produces Wattprint-0.1.0-portable.exe in dist/
 ```
-
-**On Linux/WSL Ubuntu 24.04+**, webkit2gtk-4.0 isn't available — Wails needs the `webkit2_41` build tag:
-
-```sh
-wails dev -tags webkit2_41
-wails build -tags webkit2_41
-```
-
-The single `.exe` is portable — no installer required.
-
-### WSL / Linux dev
-
-If you're developing inside WSL, install the Linux GUI deps first:
-
-```sh
-sudo apt update
-sudo apt install -y libgtk-3-dev libwebkit2gtk-4.1-dev pkg-config build-essential
-```
-
-Then `wails dev` will open a window in WSLg (Windows 11) automatically. On Windows 10 WSL you'll need an X server (VcXsrv/Xming) with `DISPLAY=:0` exported.
-
-To cross-compile the Windows `.exe` from WSL, see the GitHub Actions workflow in `.github/workflows/release.yml` — it runs on `windows-latest` and uploads the binary to Releases on tag push.
 
 ## Architecture
 
 ```
-cmd/wattprint/        # entry point
-internal/
-  app/                # Wails binding layer (thin)
-  service/            # domain logic: sampling loop, rollup loop, queries
-  collector/          # per-component power estimation + per-process attribution
-  store/              # SQLite repository (WAL mode)
-  forecast/           # monthly projection engine
-  config/             # user settings persistence
-frontend/             # Svelte 5 + uPlot UI
+src/
+  main/              # Electron main process (Node)
+    index.ts         # app lifecycle, BrowserWindow
+    ipc.ts           # ipcMain handlers
+    config.ts        # electron-store
+    store.ts         # better-sqlite3
+    collector.ts     # systeminformation sampling
+    forecast.ts      # monthly projection
+    service.ts       # sample + rollup loops
+  preload/
+    index.ts         # contextBridge — exposes window.api
+  shared/
+    types.ts         # shared TS types
+  renderer/          # Svelte 5 + uPlot UI
+    src/
+      App.svelte
+      views/         # Live, Hourly, AllDevices, TopConsumers, Forecast, Settings
+      lib/           # stores, format, ipc (wails.ts)
 ```
-
-The collector estimates wattage from CPU/GPU utilization, memory usage, and I/O activity. Per-process attribution distributes total CPU watts across processes by their CPU% share. GPU per-process attribution is a v0.2 enhancement (NVML).
-
-All readings persist to a local SQLite database; the hourly rollup loop maintains pre-aggregated buckets so the views stay fast even with months of history.
-
-## Roadmap
-
-- **v0.1** (current) — Windows MVP: live, hourly average, all devices, top consumers, forecast
-- **v0.2** — Time-of-day weighted forecast, hour-of-day heatmap, export CSV/JSON, i18n (FR/DE/ES/ZH)
-- **v0.3** — Budgets & alerts, Linux build (RAPL), on-screen overlay
-- **v1.0** — Smart-plug calibration wizard, auto-update, code signing, plugin API
 
 ## License
 
 [MIT](./LICENSE)
-
-## Inspired by
-
-[WattSeal](https://github.com/Daminoup88/WattSeal) — the real-time PC power monitor by Damien Philippe & Paul Mallard. Wattprint's per-app attribution and local-first philosophy follow the same path; the differentiated features (per-hour averages, monthly forecast, confidence bands) are what we think make the difference.
