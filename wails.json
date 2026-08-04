@@ -1,0 +1,19 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "Wattprint",
+  "outputfilename": "wattprint",
+  "frontend:install": "npm install --legacy-peer-deps",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": {
+    "name": "Richmond Goh",
+    "email": "richmondgoh@gmail.com"
+  },
+  "info": {
+    "productName": "Wattprint",
+    "productVersion": "0.1.0",
+    "copyright": "Copyright (c) 2026 Richmond Goh",
+    "comments": "Real-time per-app power, cost & CO2 monitor for your PC."
+  }
+}
