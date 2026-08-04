@@ -1,7 +1,7 @@
 # Wattprint Makefile
 # Convenience targets for common dev workflows.
 
-.PHONY: help install dev build build-win build-linux build-mac typecheck check rebuild clean distclean release
+.PHONY: help install dev run build build-win build-linux build-mac typecheck check rebuild clean distclean release
 
 .DEFAULT_GOAL := help
 
@@ -17,6 +17,8 @@ install: ## Install dependencies (postinstall auto-rebuilds better-sqlite3 for E
 
 dev: install ## Install deps if needed, then run the dev server
 	npm run dev
+
+run: dev ## Alias for `make dev` — install deps and launch the app
 
 build: ## Build all three (main + preload + renderer) to out/
 	npm run build
