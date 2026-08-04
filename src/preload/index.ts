@@ -1,11 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { WattprintAPI, Settings, Snapshot } from '../shared/types.js'
+import type { WattprintAPI, Settings, Snapshot, SystemInfo } from '../shared/types.js'
 
 const api: WattprintAPI = {
   start: () => ipcRenderer.invoke('wattprint:start'),
 
   getSettings: () => ipcRenderer.invoke('wattprint:getSettings'),
   updateSettings: (s: Settings) => ipcRenderer.invoke('wattprint:updateSettings', s),
+  getSystemInfo: (): Promise<SystemInfo> => ipcRenderer.invoke('wattprint:getSystemInfo'),
 
   viewTotals: (fromIso, toIso, scope) =>
     ipcRenderer.invoke('wattprint:viewTotals', fromIso, toIso, scope),

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { snapshot, liveBuffer } from '../lib/stores.svelte.ts';
+  import { snapshot, liveBuffer, systemInfo } from '../lib/stores.svelte.ts';
   import StatCard from '../lib/components/StatCard.svelte';
   import LineChart from '../lib/components/LineChart.svelte';
   import { fmtW, fmtTime } from '../lib/format';
@@ -16,18 +16,33 @@
   let topProcesses = $derived(
     [...(snapshot.latest?.processes ?? [])].sort((a, b) => b.w - a.w).slice(0, 8)
   );
+
+  // System info strip text
+  let sysText = $derived.by(() => {
+    const s = systemInfo.value
+    if (!s) return null
+    const cpu = s.cpu
+    const mem = (s.memoryTotalBytes / (1024 ** 3)).toFixed(0)
+    const gpus = s.gpus.length === 0
+      ? 'no GPU'
+      : s.gpus.map((g) => `${g.vendor} ${g.model}`.trim()).join(', ')
+    return `${cpu.brand} · ${cpu.physicalCores}C/${cpu.cores}T · ${cpu.speedGHz.toFixed(1)} GHz · ${mem} GB · ${gpus}`
+  })
 </script>
 
 <div class="view">
   <header>
     <h1>Live</h1>
     <p class="sub">1-second updates. {snapshot.latest ? `Last sample: ${fmtTime(snapshot.latest.ts)}` : 'waiting…'}</p>
+    {#if sysText}
+      <p class="sys" title={sysText}>{sysText}</p>
+    {/if}
   </header>
 
   <div class="grid">
     <StatCard label="Total" value={fmtW(snapshot.latest?.totalW ?? 0)} tone="good" />
     <StatCard label="CPU" value={fmtW(snapshot.latest?.components.cpu ?? 0)} />
-    <StatCard label="GPU" value={fmtW(snapshot.latest?.components.gpu ?? 0)} />
+    <StatCard label="GPU" value={fmtW(snapshot.latest?.components.gpu ?? null)} />
     <StatCard label="RAM" value={fmtW(snapshot.latest?.components.ram ?? 0)} />
     <StatCard label="Disk" value={fmtW(snapshot.latest?.components.disk ?? 0)} />
     <StatCard label="Network" value={fmtW(snapshot.latest?.components.net ?? 0)} />
@@ -99,6 +114,15 @@
   }
   header h1 { margin: 0 0 4px; font-size: 22px; font-weight: 700; }
   header .sub { margin: 0; color: var(--fg-2); font-size: 13px; }
+  header .sys {
+    margin: 4px 0 0;
+    color: var(--fg-1);
+    font-size: 12px;
+    font-family: var(--mono);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

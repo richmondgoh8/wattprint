@@ -46,7 +46,31 @@ export function initStore(userDataDir: string): void {
       PRIMARY KEY (hour, scope, key)
     );
     CREATE INDEX IF NOT EXISTS idx_rollups_key ON hourly_rollups(scope, key, hour);
+
+    CREATE TABLE IF NOT EXISTS schema_version (
+      id      INTEGER PRIMARY KEY,
+      version INTEGER NOT NULL
+    );
   `)
+
+  // Schema migrations. Each migration is idempotent: it only runs if the
+  // recorded version is less than the target. We use a single version row
+  // keyed by id=0, so we can use INSERT OR REPLACE for a clean upsert.
+  const SCHEMA_ID = 0
+  db.prepare('INSERT OR IGNORE INTO schema_version(version) VALUES (?)').run(SCHEMA_ID)
+  const current =
+    (db.prepare('SELECT version FROM schema_version WHERE rowid = ?').get(SCHEMA_ID) as
+      | { version: number }
+      | undefined)?.version ?? 0
+
+  if (current < 2) {
+    // v2: nuke historical samples + rollups. Reason: the v0.1 disk estimator
+    // had a units bug that wrote values like 6.8 MW to the DB. We've fixed
+    // it, but the bad rows are still in storage. Wipe once; future writes
+    // are correct.
+    db.exec('DELETE FROM samples; DELETE FROM hourly_rollups;')
+    db.prepare('UPDATE schema_version SET version = ? WHERE rowid = ?').run(2, SCHEMA_ID)
+  }
 }
 
 export function closeStore(): void {

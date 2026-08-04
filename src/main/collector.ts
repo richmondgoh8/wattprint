@@ -1,19 +1,19 @@
 // Per-second system power sampler.
 // v0.1 estimation model (replaceable later with NVML/Intel-RAPL where possible):
 //   - CPU:    TDP × cpu%
-//   - GPU:    NVML if NVIDIA, else TDP × gpu% (heuristic)
+//   - GPU:    5W integrated / 25W discrete idle (heuristic — no real cross-platform util signal)
 //   - RAM:    ~3 W per 8 GB used
 //   - Disk:   3 W idle + 1 W per MB/s
 //   - Network: 0.5 W per MB/s
 // Per-process attribution distributes CPU watts by CPU% share.
 
 import * as si from 'systeminformation'
-import { performance } from 'node:perf_hooks'
 import type { ProcessSample } from '../shared/types.js'
 
 export interface CollectorOptions {
   cpuTDPWatts: number
-  gpuTDPWatts: number
+  gpuIdleWattsIntegrated: number
+  gpuIdleWattsDiscrete: number
   ramWattsPer8GB: number
   diskIdleWatts: number
   diskActiveWattsPerMBs: number
@@ -22,7 +22,8 @@ export interface CollectorOptions {
 
 const DEFAULTS: CollectorOptions = {
   cpuTDPWatts: 95,
-  gpuTDPWatts: 150,
+  gpuIdleWattsIntegrated: 5,
+  gpuIdleWattsDiscrete: 25,
   ramWattsPer8GB: 3,
   diskIdleWatts: 3,
   diskActiveWattsPerMBs: 1,
@@ -38,6 +39,14 @@ interface DiskPrev {
   wx: number
 }
 
+export interface SystemSnapshot {
+  components: Record<string, number | null>
+  processes: ProcessSample[]
+  totalW: number
+  gpuHasSensor: boolean
+  gpuHeuristicIdle: number
+}
+
 export class Collector {
   private opts: CollectorOptions
   private cpuPctLast = 0
@@ -45,19 +54,17 @@ export class Collector {
   private lastTime = 0
   private prevNet: NetPrev | null = null
   private prevDisk = new Map<string, DiskPrev>()
+  // GPU detection is computed once on first sample.
+  private gpuDetected: { hasDiscrete: boolean; hasIntegrated: boolean } | null = null
 
   constructor(opts: Partial<CollectorOptions> = {}) {
     this.opts = { ...DEFAULTS, ...opts }
   }
 
-  async sample(): Promise<{
-    components: Record<string, number>
-    processes: ProcessSample[]
-    totalW: number
-  }> {
+  async sample(): Promise<SystemSnapshot> {
     const now = Date.now()
     const dt = this.lastTime === 0 ? 0 : (now - this.lastTime) / 1000
-    const components: Record<string, number> = {}
+    const components: Record<string, number | null> = {}
 
     // CPU
     try {
@@ -74,7 +81,6 @@ export class Collector {
     // RAM
     try {
       const mem = await si.mem()
-      // watts per 8 GB of used memory
       components.ram = this.opts.ramWattsPer8GB * (mem.used / (8 * 1024 ** 3))
     } catch {
       components.ram = 0
@@ -85,8 +91,6 @@ export class Collector {
     if (dt > 0) {
       try {
         const fs = await si.fsStats()
-        // systeminformation: rx/wx are TOTAL bytes since boot.
-        // rx_sec/wx_sec are bytes/s since the previous call (may be null on first call).
         let bytesPerSec = 0
         if (fs.rx_sec != null && fs.wx_sec != null) {
           bytesPerSec = (fs.rx_sec || 0) + (fs.wx_sec || 0)
@@ -127,26 +131,51 @@ export class Collector {
     }
     components.net = netW
 
-    // GPU (heuristic — NVML/ADLX lands later)
-    let gpuPct = 0
+    // GPU: detect once, then apply heuristic idle. v0.1 has no real cross-platform
+    // util signal (systeminformation.graphics doesn't expose %); NVML lands later.
+    const gpu = await this.detectGpu()
+    let gpuW: number | null = 0
+    let gpuHeuristicIdle = 0
+    if (!gpu.hasDiscrete && !gpu.hasIntegrated) {
+      gpuW = null // no GPU detected at all
+    } else {
+      gpuHeuristicIdle = gpu.hasDiscrete
+        ? this.opts.gpuIdleWattsDiscrete
+        : this.opts.gpuIdleWattsIntegrated
+      gpuW = gpuHeuristicIdle
+    }
+    components.gpu = gpuW
+
+    // Per-process CPU attribution
+    const processes = await this.attributeProcesses(components.cpu as number)
+
+    // totalW only counts non-null components
+    const totalW = Object.values(components).reduce<number>((s, w) => s + (w ?? 0), 0)
+    this.lastTime = now
+    return {
+      components,
+      processes,
+      totalW,
+      gpuHasSensor: false, // v0.1: never have a real sensor
+      gpuHeuristicIdle
+    }
+  }
+
+  private async detectGpu(): Promise<{ hasDiscrete: boolean; hasIntegrated: boolean }> {
+    if (this.gpuDetected) return this.gpuDetected
+    let hasDiscrete = false
+    let hasIntegrated = false
     try {
       const g = await si.graphics()
-      if (g.controllers && g.controllers.length > 0) {
-        // g.controllers doesn't expose utilization; use load from graphics()
-        const lg = await si.graphics()
-        gpuPct = 0 // no reliable cross-platform signal in v0.1
+      for (const c of g.controllers ?? []) {
+        if (c.vendor?.toLowerCase().includes('intel')) hasIntegrated = true
+        else if (c.vendor) hasDiscrete = true
       }
     } catch {
       // ignore
     }
-    components.gpu = this.opts.gpuTDPWatts * clamp01(gpuPct / 100)
-
-    // Per-process CPU attribution
-    const processes = await this.attributeProcesses(components.cpu)
-
-    const totalW = Object.values(components).reduce((s, w) => s + w, 0)
-    this.lastTime = now
-    return { components, processes, totalW }
+    this.gpuDetected = { hasDiscrete, hasIntegrated }
+    return this.gpuDetected
   }
 
   private async attributeProcesses(totalCPUW: number): Promise<ProcessSample[]> {

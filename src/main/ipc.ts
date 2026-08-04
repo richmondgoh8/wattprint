@@ -4,7 +4,7 @@ import { ipcMain, type BrowserWindow } from 'electron'
 import { getSettings, updateSettings } from './config.js'
 import { totalsByKey, hourlyByKey } from './store.js'
 import type { Service } from './service.js'
-import type { Settings, KeyTotal, HourlyRollup } from '../shared/types.js'
+import type { Settings, KeyTotal, HourlyRollup, SystemInfo } from '../shared/types.js'
 import type { ForecastResult } from './forecast.js'
 
 export function registerIpcHandlers(svc: Service): void {
@@ -16,6 +16,7 @@ export function registerIpcHandlers(svc: Service): void {
   ipcMain.handle('wattprint:updateSettings', (_e, patch: Partial<Settings>): Settings => {
     return updateSettings(patch)
   })
+  ipcMain.handle('wattprint:getSystemInfo', (): Promise<SystemInfo> => svc.viewSystemInfo())
 
   ipcMain.handle(
     'wattprint:viewTotals',

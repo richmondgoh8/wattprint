@@ -7,18 +7,23 @@
   import TopConsumers from './views/TopConsumers.svelte';
   import Forecast from './views/Forecast.svelte';
   import Settings from './views/Settings.svelte';
-  import { route, pushSample, status, settings } from './lib/stores.svelte.ts';
-  import { start, getSettings, onSample, onStatus } from './lib/wails';
+  import { route, pushSample, status, settings, systemInfo } from './lib/stores.svelte.ts';
+  import { start, getSettings, getSystemInfo, onSample, onStatus } from './lib/wails';
 
   let unsubSample: (() => void) | null = null;
   let unsubStatus: (() => void) | null = null;
 
   onMount(async () => {
-    // Load settings, subscribe to events, then start the collector.
+    // Load settings + system info, subscribe to events, then start the collector.
     try {
       settings.value = await getSettings();
     } catch (e) {
       status.message = 'failed to load settings';
+    }
+    try {
+      systemInfo.value = await getSystemInfo();
+    } catch {
+      // Non-fatal: Live header just won't show system info.
     }
     unsubSample = onSample((s) => pushSample(s));
     unsubStatus = onStatus((s) => (status.message = s));

@@ -7,6 +7,7 @@ import type {
   HourlyRollup,
   ForecastResult,
   Settings,
+  SystemInfo,
   WattprintAPI
 } from '../../../shared/types.js'
 
@@ -22,7 +23,8 @@ export type {
   KeyTotal,
   HourlyRollup,
   ForecastResult,
-  Settings
+  Settings,
+  SystemInfo
 } from '../../../shared/types.js'
 
 function api() {
@@ -32,6 +34,7 @@ function api() {
 export const start = (): Promise<void> => api().start()
 export const getSettings = (): Promise<Settings> => api().getSettings()
 export const updateSettings = (s: Settings): Promise<void> => api().updateSettings(s)
+export const getSystemInfo = (): Promise<SystemInfo> => api().getSystemInfo()
 
 export const viewTotals = (from: Date, to: Date, scope: string): Promise<KeyTotal[]> =>
   api().viewTotals(from.toISOString(), to.toISOString(), scope)

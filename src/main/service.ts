@@ -5,8 +5,9 @@ import { BrowserWindow } from 'electron'
 import { Collector } from './collector.js'
 import { getSettings } from './config.js'
 import { writeSamples, rollupHour, totalsByKey, hourlyByKey } from './store.js'
-import type { Snapshot, KeyTotal, HourlyRollup } from '../shared/types.js'
+import type { Snapshot, KeyTotal, HourlyRollup, SystemInfo } from '../shared/types.js'
 import { compute as forecastCompute, type ForecastResult } from './forecast.js'
+import * as si from 'systeminformation'
 
 export class Service {
   private collector = new Collector()
@@ -59,10 +60,11 @@ export class Service {
     this.emitSample(snapshot)
   }
 
-  private persist(snap: { components: Record<string, number>; processes: { pid: number; name: string; cpuW: number; gpuW: number; w: number }[]; totalW: number }): void {
+  private persist(snap: { components: Record<string, number | null>; processes: { pid: number; name: string; cpuW: number; gpuW: number; w: number }[]; totalW: number }): void {
     const ts = new Date()
     const samples: { ts: Date; scope: 'component' | 'process'; key: string; watts: number }[] = []
     for (const [key, watts] of Object.entries(snap.components)) {
+      if (watts == null) continue
       samples.push({ ts, scope: 'component', key, watts })
     }
     for (const p of snap.processes) {
@@ -104,6 +106,35 @@ export class Service {
   viewForecast(): ForecastResult {
     const s = getSettings()
     return forecastCompute(s.forecastWindowDays, s.costPerKWh, s.gridCarbonIntensity, s.currency)
+  }
+
+  async viewSystemInfo(): Promise<SystemInfo> {
+    const [cpu, mem, g, os] = await Promise.all([
+      si.cpu(),
+      si.mem(),
+      si.graphics(),
+      si.osInfo()
+    ])
+    return {
+      cpu: {
+        brand: cpu.brand,
+        manufacturer: cpu.manufacturer,
+        cores: cpu.cores,
+        physicalCores: cpu.physicalCores,
+        speedGHz: cpu.speed
+      },
+      memoryTotalBytes: mem.total,
+      gpus: (g.controllers ?? []).map((c) => ({
+        vendor: c.vendor ?? 'Unknown',
+        model: c.model ?? 'Unknown',
+        vram: c.vram ?? null
+      })),
+      os: {
+        platform: process.platform,
+        release: os.release,
+        hostname: os.hostname
+      }
+    }
   }
 
   // ---- Emitters ----

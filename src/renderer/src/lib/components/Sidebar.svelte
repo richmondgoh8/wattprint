@@ -1,13 +1,14 @@
 <script lang="ts">
   import { route, status, type Route } from '../stores.svelte.ts';
+  import Icon from './Icon.svelte';
 
-  const items: { id: Route; label: string; icon: string }[] = [
-    { id: 'live', label: 'Live', icon: '⚡' },
-    { id: 'hourly', label: 'Hourly Average', icon: '⏱' },
-    { id: 'devices', label: 'All Devices', icon: '🖥' },
-    { id: 'top', label: 'Top Consumers', icon: '🏆' },
-    { id: 'forecast', label: 'Forecast', icon: '📈' },
-    { id: 'settings', label: 'Settings', icon: '⚙' },
+  const items: { id: Route; label: string; icon: 'bolt' | 'clock' | 'chip' | 'trophy' | 'chart' | 'gear' }[] = [
+    { id: 'live', label: 'Live', icon: 'bolt' },
+    { id: 'hourly', label: 'Hourly Average', icon: 'clock' },
+    { id: 'devices', label: 'All Devices', icon: 'chip' },
+    { id: 'top', label: 'Top Consumers', icon: 'trophy' },
+    { id: 'forecast', label: 'Forecast', icon: 'chart' },
+    { id: 'settings', label: 'Settings', icon: 'gear' },
   ];
 </script>
 
@@ -27,7 +28,7 @@
         class:active={route.current === item.id}
         onclick={() => (route.current = item.id)}
       >
-        <span class="icon">{item.icon}</span>
+        <span class="icon"><Icon name={item.icon} /></span>
         <span>{item.label}</span>
       </button>
     {/each}
@@ -89,7 +90,7 @@
     color: var(--fg-0);
     border-color: var(--border);
   }
-  .icon { font-size: 14px; opacity: 0.8; }
+  .icon { display: inline-flex; align-items: center; justify-content: center; opacity: 0.8; }
 
   .status {
     margin-top: auto;

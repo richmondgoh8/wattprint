@@ -1,8 +1,8 @@
 // Shared formatting helpers. All numbers in the UI should pass through
 // these so locale and unit conventions stay consistent.
 
-export function fmtW(watts: number, digits = 1): string {
-  if (!isFinite(watts) || watts < 0) return '—';
+export function fmtW(watts: number | null | undefined, digits = 1): string {
+  if (watts == null || !isFinite(watts) || watts < 0) return '—';
   if (watts >= 1000) return `${(watts / 1000).toFixed(2)} kW`;
   return `${watts.toFixed(digits)} W`;
 }

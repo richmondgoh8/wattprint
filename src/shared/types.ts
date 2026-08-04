@@ -13,7 +13,8 @@ export interface ProcessSample {
 
 export interface Snapshot {
   ts: string; // ISO 8601
-  components: Record<string, number>;
+  /** Per-component watts. `null` means no sensor / not applicable (e.g. no GPU). */
+  components: Record<string, number | null>;
   processes: ProcessSample[];
   totalW: number;
 }
@@ -59,28 +60,42 @@ export interface ForecastResult {
 }
 
 export interface Settings {
-  costPerKWh: number;
-  currency: string;
-  gridCarbonIntensity: number;
-  forecastWindowDays: number;
-  sampleIntervalSeconds: number;
-  startOnLogin: boolean;
-  theme: string;
+  costPerKWh: number
+  currency: string
+  gridCarbonIntensity: number
+  forecastWindowDays: number
+  sampleIntervalSeconds: number
+  startOnLogin: boolean
+  theme: string
+}
+
+export interface SystemInfo {
+  cpu: {
+    brand: string
+    manufacturer: string
+    cores: number
+    physicalCores: number
+    speedGHz: number
+  }
+  memoryTotalBytes: number
+  gpus: { vendor: string; model: string; vram: number | null }[]
+  os: { platform: NodeJS.Platform; release: string; hostname: string }
 }
 
 /** The shape exposed by preload's contextBridge as window.api. */
 export interface WattprintAPI {
   // Lifecycle
-  start(): Promise<void>;
-  getSettings(): Promise<Settings>;
-  updateSettings(s: Settings): Promise<void>;
+  start(): Promise<void>
+  getSettings(): Promise<Settings>
+  updateSettings(s: Settings): Promise<void>
+  getSystemInfo(): Promise<SystemInfo>
 
   // Queries
-  viewTotals(fromIso: string, toIso: string, scope: string): Promise<KeyTotal[]>;
-  viewHourly(fromIso: string, toIso: string, scope: string, key: string): Promise<HourlyRollup[]>;
-  viewForecast(): Promise<ForecastResult>;
+  viewTotals(fromIso: string, toIso: string, scope: string): Promise<KeyTotal[]>
+  viewHourly(fromIso: string, toIso: string, scope: string, key: string): Promise<HourlyRollup[]>
+  viewForecast(): Promise<ForecastResult>
 
   // Events
-  onSample(cb: (s: Snapshot) => void): () => void;
-  onStatus(cb: (s: string) => void): () => void;
+  onSample(cb: (s: Snapshot) => void): () => void
+  onStatus(cb: (s: string) => void): () => void
 }
