@@ -47,6 +47,19 @@ wails build        # produces wattprint.exe in build/bin/
 
 The single `.exe` is portable — no installer required.
 
+### WSL / Linux dev
+
+If you're developing inside WSL, install the Linux GUI deps first:
+
+```sh
+sudo apt update
+sudo apt install -y libgtk-3-dev libwebkit2gtk-4.1-dev pkg-config build-essential
+```
+
+Then `wails dev` will open a window in WSLg (Windows 11) automatically. On Windows 10 WSL you'll need an X server (VcXsrv/Xming) with `DISPLAY=:0` exported.
+
+To cross-compile the Windows `.exe` from WSL, see the GitHub Actions workflow in `.github/workflows/release.yml` — it runs on `windows-latest` and uploads the binary to Releases on tag push.
+
 ## Architecture
 
 ```
