@@ -1,19 +1,49 @@
 {
-  "$schema": "https://wails.io/schemas/config.v2.json",
   "name": "Wattprint",
-  "outputfilename": "wattprint",
-  "frontend:install": "npm install --legacy-peer-deps",
   "frontend:build": "npm run build",
+  "frontend:install": "npm install --legacy-peer-deps",
+  "frontend:dev": "",
+  "frontend:dev:build": "",
+  "frontend:dev:install": "",
   "frontend:dev:watcher": "npm run dev",
   "frontend:dev:serverUrl": "auto",
-  "author": {
+  "wailsjsdir": "/home/sinlucidious/projects/wattprint/frontend",
+  "version": "2",
+  "projectdir": "/home/sinlucidious/projects/wattprint",
+  "build:dir": "build",
+  "build:tags": "",
+  "outputfilename": "wattprint",
+  "OutputType": "",
+  "Platform": "",
+  "runNonNativeBuildHooks": false,
+  "postBuildHooks": null,
+  "preBuildHooks": null,
+  "Author": {
     "name": "Richmond Goh",
     "email": "richmondgoh@gmail.com"
   },
-  "info": {
+  "Info": {
+    "companyName": "Wattprint",
     "productName": "Wattprint",
     "productVersion": "0.1.0",
     "copyright": "Copyright (c) 2026 Richmond Goh",
-    "comments": "Real-time per-app power, cost & CO2 monitor for your PC."
+    "comments": "Real-time per-app power, cost \u0026 CO2 monitor for your PC.",
+    "fileAssociations": null,
+    "protocols": null
+  },
+  "debounceMS": 100,
+  "devServer": "localhost:34115",
+  "appargs": "",
+  "nsisType": "multiple",
+  "obfuscated": false,
+  "garbleargs": "",
+  "frontend:dir": "frontend",
+  "viteServerTimeout": 10,
+  "bindings": {
+    "ts_generation": {
+      "prefix": "",
+      "suffix": "",
+      "outputType": ""
+    }
   }
 }
