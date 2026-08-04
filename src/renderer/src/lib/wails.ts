@@ -1,117 +1,45 @@
-// Session 1 stub: minimal types + no-op bindings. Replaced in Session 2
-// with real IPC bindings against Electron's preload-exposed window.api.
-//
-// Renderer must compile against these types now, but the actual data flows
-// in via Session 2 (collector + store + ipc.ts).
+// Typed wrapper around the preload-exposed window.api.
+// Same shape as the Wails-era wails.ts so the Svelte views need no changes.
 
-export type ComponentKey = 'cpu' | 'gpu' | 'ram' | 'disk' | 'net';
+import type {
+  Snapshot,
+  KeyTotal,
+  HourlyRollup,
+  ForecastResult,
+  Settings,
+  WattprintAPI
+} from '../../../shared/types.js'
 
-export interface Snapshot {
-  ts: string;
-  components: Record<string, number>;
-  processes: { pid: number; name: string; cpuW: number; gpuW: number; w: number }[];
-  totalW: number;
+declare global {
+  interface Window {
+    api: WattprintAPI
+  }
 }
 
-export interface KeyTotal {
-  scope: string;
-  key: string;
-  kWh: number;
-  avgW: number;
-  maxW: number;
+// Re-export shared types so existing views can keep `import { Snapshot, Settings } from '../lib/wails'`
+export type {
+  Snapshot,
+  KeyTotal,
+  HourlyRollup,
+  ForecastResult,
+  Settings
+} from '../../../shared/types.js'
+
+function api() {
+  return window.api
 }
 
-export interface HourlyRollup {
-  hour: string;
-  scope: string;
-  key: string;
-  kWh: number;
-  avgW: number;
-  maxW: number;
-  minutes: number;
-}
+export const start = (): Promise<void> => api().start()
+export const getSettings = (): Promise<Settings> => api().getSettings()
+export const updateSettings = (s: Settings): Promise<void> => api().updateSettings(s)
 
-export interface ForecastResult {
-  windowDays: number;
-  windowStart: string;
-  windowEnd: string;
-  hoursCovered: number;
-  kWhInWindow: number;
-  avgKWhPerHour: number;
-  stdDevKWhPerHour: number;
-  projectedKWhPerDay: number;
-  projectedKWhMonth: number;
-  projectedCostMonth: number;
-  projectedCO2Kg: number;
-  currency: string;
-  costPerKWh: number;
-  gridCarbonGCO2PerKWh: number;
-  lowKWhMonth: number;
-  highKWhMonth: number;
-  lowCostMonth: number;
-  highCostMonth: number;
-  hasEnoughData: boolean;
-}
+export const viewTotals = (from: Date, to: Date, scope: string): Promise<KeyTotal[]> =>
+  api().viewTotals(from.toISOString(), to.toISOString(), scope)
 
-export interface Settings {
-  costPerKWh: number;
-  currency: string;
-  gridCarbonIntensity: number;
-  forecastWindowDays: number;
-  sampleIntervalSeconds: number;
-  startOnLogin: boolean;
-  theme: string;
-}
+export const viewHourly = (from: Date, to: Date, scope: string, key: string): Promise<HourlyRollup[]> =>
+  api().viewHourly(from.toISOString(), to.toISOString(), scope, key)
 
-const NOOP = (): void => {};
-const unsubNoop = (): void => {};
+export const viewForecast = (): Promise<ForecastResult> => api().viewForecast()
 
-// --- Session 1 stubs. Will be real in Session 2. ---
-export const start = async (): Promise<void> => { /* wired in Session 2 */ };
-export const getSettings = async (): Promise<Settings> => ({
-  costPerKWh: 0.17,
-  currency: 'USD',
-  gridCarbonIntensity: 384,
-  forecastWindowDays: 7,
-  sampleIntervalSeconds: 1,
-  startOnLogin: false,
-  theme: 'system',
-});
-export const updateSettings = async (_s: Settings): Promise<void> => { /* wired in Session 2 */ };
-export const viewTotals = async (_from: Date, _to: Date, _scope: string): Promise<KeyTotal[]> => [];
-export const viewHourly = async (
-  _from: Date,
-  _to: Date,
-  _scope: string,
-  _key: string
-): Promise<HourlyRollup[]> => [];
-export const viewForecast = async (): Promise<ForecastResult> => ({
-  windowDays: 7,
-  windowStart: new Date().toISOString(),
-  windowEnd: new Date().toISOString(),
-  hoursCovered: 0,
-  kWhInWindow: 0,
-  avgKWhPerHour: 0,
-  stdDevKWhPerHour: 0,
-  projectedKWhPerDay: 0,
-  projectedKWhMonth: 0,
-  projectedCostMonth: 0,
-  projectedCO2Kg: 0,
-  currency: 'USD',
-  costPerKWh: 0.17,
-  gridCarbonGCO2PerKWh: 384,
-  lowKWhMonth: 0,
-  highKWhMonth: 0,
-  lowCostMonth: 0,
-  highCostMonth: 0,
-  hasEnoughData: false,
-});
-
-export const onSample = (_cb: (s: Snapshot) => void): (() => void) => {
-  console.warn('[wattprint] onSample is a Session 1 stub; will receive real data in Session 2');
-  return unsubNoop;
-};
-export const onStatus = (cb: (s: string) => void): (() => void) => {
-  cb('Session 1 stub — IPC wiring lands in Session 2');
-  return unsubNoop;
-};
+export const onSample = (cb: (s: Snapshot) => void): (() => void) => api().onSample(cb)
+export const onStatus = (cb: (s: string) => void): (() => void) => api().onStatus(cb)

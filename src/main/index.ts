@@ -1,13 +1,18 @@
+// Electron main process — lifecycle + wires up config, store, service, IPC.
+
 import { app, BrowserWindow, shell } from 'electron'
 import { join } from 'node:path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { initConfig } from './config.js'
+import { initStore, closeStore } from './store.js'
 import { registerIpcHandlers } from './ipc.js'
+import { Service } from './service.js'
 
-// Session 1: minimal lifecycle, no IPC handlers yet (added in Session 2).
-// All renderer state will read 0/defaults from the Session 1 stub until then.
+let mainWindow: BrowserWindow | null = null
+let service: Service | null = null
 
 function createWindow(): void {
-  const mainWindow = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
     minWidth: 960,
@@ -17,7 +22,7 @@ function createWindow(): void {
     backgroundColor: '#0d1117',
     title: 'Wattprint',
     webPreferences: {
-      preload: join(import.meta.dirname, '../preload/index.js'),
+      preload: join(import.meta.dirname, '../preload/index.mjs'),
       sandbox: false,
       contextIsolation: true,
       nodeIntegration: false
@@ -25,7 +30,11 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
+    mainWindow!.show()
+  })
+
+  mainWindow.on('closed', () => {
+    mainWindow = null
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -47,7 +56,16 @@ app.whenReady().then(() => {
     optimizer.watchWindowShortcuts(window)
   })
 
-  registerIpcHandlers()
+  // Init config + store before anything tries to use them
+  const userData = app.getPath('userData')
+  const wattprintDir = join(userData, 'wattprint')
+  initConfig()
+  initStore(wattprintDir)
+
+  // Service emits sample/status to the main window
+  service = new Service(() => mainWindow)
+  registerIpcHandlers(service)
+  service.start()
 
   createWindow()
 
@@ -60,4 +78,9 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit()
   }
+})
+
+app.on('before-quit', () => {
+  service?.stop()
+  closeStore()
 })
