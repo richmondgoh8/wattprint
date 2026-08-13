@@ -11,7 +11,7 @@ const bin = (name) => join(root, 'node_modules/.bin', process.platform === 'win3
 
 function run(command, args) {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { cwd: root, stdio: 'inherit', shell: false })
+    const child = spawn(command, args, { cwd: root, stdio: 'inherit', shell: true })
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       if (code === 0) resolve()
