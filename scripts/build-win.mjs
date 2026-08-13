@@ -84,7 +84,11 @@ async function main() {
     }
 
     console.log('▶ Packaging the Windows build (electron-builder)…')
-    await run(bin('electron-builder'), ['--win', '--config', 'electron-builder.yml'])
+    const ebArgs = ['--win', '--config', 'electron-builder.yml']
+    if (!process.env.CSC_LINK && !process.env.WIN_CSC_LINK) {
+      ebArgs.push('-c.win.signExecutable=false')
+    }
+    await run(bin('electron-builder'), ebArgs)
   }
 }
 
