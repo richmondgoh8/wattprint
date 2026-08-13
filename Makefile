@@ -47,4 +47,4 @@ distclean: clean ## Also remove node_modules
 release: ## Tag a release and push (run from a clean main)
 	@if [ -z "$(V)" ]; then echo "Usage: make release V=0.1.0"; exit 1; fi
 	git tag v$(V) && git push origin v$(V)
-	@echo "Tagged v$(V). CI will build the Windows .exe."
+	@echo "Tagged v$(V). CI will build the Windows .exe and Linux AppImage."
