@@ -295,7 +295,7 @@ export interface SystemInfo {
     gpuStatus: string
   }
   os: {
-    platform: NodeJS.Platform
+    platform: string
     release: string
     hostname: string
     build: string
