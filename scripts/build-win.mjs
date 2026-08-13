@@ -21,8 +21,11 @@ function run(command, args) {
 }
 
 async function main() {
-  await run(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'build'])
-  if (process.platform === 'linux') await run('wine', ['--version'])
+  if (process.platform !== 'win32') {
+    throw new Error('build-win.mjs must be run on Windows. Use npm run build:linux for Linux builds.')
+  }
+
+  await run('npm.cmd', ['run', 'build'])
 
   let targetRebuildStarted = false
   try {
@@ -35,15 +38,6 @@ async function main() {
       '--platform', 'win32',
       '--arch', 'x64'
     ])
-
-    if (process.platform === 'linux') {
-      const nativePath = join(root, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node')
-      const description = execFileSync('file', [nativePath], { encoding: 'utf8' }).trim()
-      console.log(description)
-      if (!/PE32\+|MS Windows/i.test(description)) {
-        throw new Error('Windows native dependency rebuild did not produce a Windows PE binary.')
-      }
-    }
 
     console.log('▶ Packaging the Windows build (electron-builder)…')
     await run(bin('electron-builder'), ['--win', '--config', 'electron-builder.yml'])
