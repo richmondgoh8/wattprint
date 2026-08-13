@@ -1,6 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { readFileSync } from 'node:fs'
-import { existsSync } from 'node:fs'
+import { readFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -35,59 +34,57 @@ async function main() {
     )
   }
 
-  // On WSL use the Linux npm (Node bundle step is pure JS and works cross-platform).
+  // On WSL use the Linux npm (the JS bundle step is pure JS and works cross-platform).
   await run(isWin ? 'npm.cmd' : 'npm', ['run', 'build'])
 
-  let targetRebuildStarted = false
-  try {
+  if (isWin) {
+    // ── Native Windows build ────────────────────────────────────────
+    // Force-rebuild better-sqlite3 for the win32 Electron ABI.
     console.log('▶ Rebuilding better-sqlite3 for Windows (win32/x64)…')
-    targetRebuildStarted = true
-
-    const rebuildArgs = [
+    await run(bin('electron-rebuild'), [
+      '--force',
       '--which-module', 'better-sqlite3',
       '--version', electronVersion,
       '--platform', 'win32',
       '--arch', 'x64'
-    ]
+    ])
 
-    if (isWin) {
-      // On Windows, force recompilation (guaranteed local build).
-      rebuildArgs.push('--force')
-    }
-    // On WSL, omit --force so electron-rebuild fetches the prebuilt
-    // win32 binary instead of attempting a cross-compile from source
-    // (node-gyp does not support cross-compilation).
+    console.log('▶ Packaging the Windows build (electron-builder)…')
+    await run(bin('electron-builder'), ['--win', '--config', 'electron-builder.yml'])
 
-    await run(bin('electron-rebuild'), rebuildArgs)
+    // Restore the dev native module so the local environment stays usable.
+    console.log(`▶ Restoring the native module for ${process.platform}/${process.arch}…`)
+    await run(bin('electron-rebuild'), [
+      '--force',
+      '--which-module', 'better-sqlite3',
+      '--version', electronVersion,
+      '--platform', process.platform,
+      '--arch', process.arch
+    ])
+    execFileSync(process.execPath, ['-e', "require('better-sqlite3')"], { cwd: root, stdio: 'pipe' })
+    console.log('✓ Dev native module restored and loads correctly.')
+  } else {
+    // ── WSL cross-build ─────────────────────────────────────────────
+    // better-sqlite3 ships prebuilt win32-x64.node in prebuilds/.
+    // electron-rebuild would overwrite it with a Linux binary (node-gyp
+    // cannot cross-compile), so we skip it and let electron-builder
+    // package the prebuilt directly.
+    console.log('▶ WSL cross-build: verifying win32-x64 prebuilt…')
 
-    // Verify we got a Windows PE binary (catches silent cross-compile
-    // failures or stale Linux binaries left in the build directory).
-    const nativePath = join(root, 'node_modules/better-sqlite3/build/Release/better_sqlite3.node')
-    const description = execFileSync('file', [nativePath], { encoding: 'utf8' }).trim()
-    console.log(description)
-    if (!/PE32\+|MS Windows/i.test(description)) {
+    const prebuiltPath = join(root, 'node_modules/better-sqlite3/prebuilds/win32-x64.node')
+    if (!existsSync(prebuiltPath)) {
       throw new Error(
-        'Native dependency rebuild did not produce a Windows PE binary.\n' +
-          'If cross-compiling from WSL, ensure better-sqlite3 publishes prebuilt binaries for your Electron version.'
+        'prebuilds/win32-x64.node not found. better-sqlite3 does not ship a prebuilt for this Electron version on win32/x64.'
       )
+    }
+    const desc = execFileSync('file', [prebuiltPath], { encoding: 'utf8' }).trim()
+    console.log(desc)
+    if (!/PE32\+|MS Windows/i.test(desc)) {
+      throw new Error('prebuilds/win32-x64.node is not a Windows PE binary.')
     }
 
     console.log('▶ Packaging the Windows build (electron-builder)…')
     await run(bin('electron-builder'), ['--win', '--config', 'electron-builder.yml'])
-  } finally {
-    if (targetRebuildStarted) {
-      console.log(`▶ Restoring the native module for ${process.platform}/${process.arch}…`)
-      await run(bin('electron-rebuild'), [
-        '--force',
-        '--which-module', 'better-sqlite3',
-        '--version', electronVersion,
-        '--platform', process.platform,
-        '--arch', process.arch
-      ])
-      // The dev environment must be usable again: load the restored module.
-      execFileSync(process.execPath, ['-e', "require('better-sqlite3')"], { cwd: root, stdio: 'pipe' })
-      console.log('✓ Dev native module restored and loads correctly.')
-    }
   }
 }
 
