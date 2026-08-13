@@ -21,8 +21,12 @@
     try {
       const r = await getReadiness();
       readiness.value = r;
-      // Do not overwrite status.message: transient collector/store/sample
-      // errors arriving via onStatus must stay visible until replaced.
+      // Back off once fully ready: poll every 60s instead of 5s to reduce
+      // unnecessary IPC wakeups (hourly data only changes at rollup boundaries).
+      if (r.hourlyBucketsAvailable >= r.forecastBucketsRequired && readinessTimer) {
+        clearInterval(readinessTimer);
+        readinessTimer = setInterval(refreshReadiness, 60_000);
+      }
     } catch {
       // The banner remains in its starting state until the backend is ready.
     }

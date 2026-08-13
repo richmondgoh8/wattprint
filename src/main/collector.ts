@@ -2,9 +2,9 @@
 // Estimation model (measured where possible):
 //   - CPU:    TDP × cpu% (load from host telemetry)
 //   - GPU:    real power via vendor CLI (nvidia-smi / amd-smi); "—" if unavailable
-//   - RAM:    ~3 W per 8 GB used
-//   - Disk:   3 W idle + 1 W per MB/s
-//   - Network: 0.5 W per MB/s
+//   - RAM:    ~3 W per 8 GB used (capped at 20 W — DIMMs saturate)
+//   - Disk:   3 W idle + ~0.01 W per MB/s (capped at 15 W — NVMe peak ~8-10 W)
+//   - Network: ~0.03 W per MB/s (capped at 12 W — NIC peak ~10-15 W)
 // Per-process attribution splits CPU watts proportionally to each process's
 // CPU-time share (sum of process watts ≈ CPU component watts).
 
@@ -29,9 +29,15 @@ const DEFAULTS: CollectorOptions = {
   cpuTDPResolved: false,
   ramWattsPer8GB: 3,
   diskIdleWatts: 3,
-  diskActiveWattsPerMBs: 1,
-  netWattsPerMBs: 0.5
+  diskActiveWattsPerMBs: 0.01,
+  netWattsPerMBs: 0.03
 }
+
+// Upper bounds so a counter-overflow spike or extreme throughput can never
+// produce physically impossible component wattage.
+const MAX_DISK_W = 15
+const MAX_NET_W = 12
+const MAX_RAM_W = 20
 
 interface NetPrev {
   rx: number
@@ -137,13 +143,13 @@ export class Collector {
     if (helperLive && telemetry.memUsedBytes != null && telemetry.memTotalBytes != null) {
       this.memUsedBytes = telemetry.memUsedBytes
       this.memTotalBytes = telemetry.memTotalBytes
-      components.ram = this.opts.ramWattsPer8GB * (this.memUsedBytes / (8 * 1024 ** 3))
+      components.ram = estimateRamWatts(this.memUsedBytes, this.opts.ramWattsPer8GB, MAX_RAM_W)
     } else {
       try {
         const mem = await si.mem()
         this.memUsedBytes = mem.used
         this.memTotalBytes = mem.total
-        components.ram = this.opts.ramWattsPer8GB * (mem.used / (8 * 1024 ** 3))
+        components.ram = estimateRamWatts(mem.used, this.opts.ramWattsPer8GB, MAX_RAM_W)
       } catch {
         components.ram = 0
       }
@@ -152,14 +158,14 @@ export class Collector {
     // Disk
     let diskW = this.opts.diskIdleWatts
     if (helperLive && telemetry.diskReadBps != null && telemetry.diskWriteBps != null) {
-      const mbs = (telemetry.diskReadBps + telemetry.diskWriteBps) / (1024 * 1024)
-      diskW += this.opts.diskActiveWattsPerMBs * mbs
+      const mbs = Math.max(0, (telemetry.diskReadBps + telemetry.diskWriteBps) / (1024 * 1024))
+      diskW = estimateDiskWatts(mbs, this.opts.diskIdleWatts, this.opts.diskActiveWattsPerMBs, MAX_DISK_W)
     } else if (dt > 0) {
       try {
         const fs = await si.fsStats()
         let bytesPerSec = 0
         if (fs.rx_sec != null && fs.wx_sec != null) {
-          bytesPerSec = (fs.rx_sec || 0) + (fs.wx_sec || 0)
+          bytesPerSec = Math.max(0, (fs.rx_sec || 0) + (fs.wx_sec || 0))
         } else if (this.prevDisk.has('*')) {
           const prev = this.prevDisk.get('*')!
           const drx = Math.max(0, (fs.rx || 0) - prev.rx)
@@ -167,8 +173,8 @@ export class Collector {
           bytesPerSec = (drx + dwx) / dt
         }
         this.prevDisk.set('*', { rx: fs.rx || 0, wx: fs.wx || 0 })
-        const mbs = bytesPerSec / (1024 * 1024)
-        diskW += this.opts.diskActiveWattsPerMBs * mbs
+        const mbs = Math.max(0, bytesPerSec / (1024 * 1024))
+        diskW = estimateDiskWatts(mbs, this.opts.diskIdleWatts, this.opts.diskActiveWattsPerMBs, MAX_DISK_W)
       } catch {
         // ignore
       }
@@ -178,8 +184,8 @@ export class Collector {
     // Network
     let netW = 0
     if (helperLive && telemetry.netRxBps != null && telemetry.netTxBps != null) {
-      const mbs = (telemetry.netRxBps + telemetry.netTxBps) / (1024 * 1024)
-      netW = this.opts.netWattsPerMBs * mbs
+      const mbs = Math.max(0, (telemetry.netRxBps + telemetry.netTxBps) / (1024 * 1024))
+      netW = estimateNetWatts(mbs, this.opts.netWattsPerMBs, MAX_NET_W)
     } else if (dt > 0) {
       try {
         const ns = await si.networkStats()
@@ -191,7 +197,7 @@ export class Collector {
           const drx = Math.max(0, cur.rx - this.prevNet.rx)
           const dtx = Math.max(0, cur.tx - this.prevNet.tx)
           const mbs = ((drx + dtx) / dt) / (1024 * 1024)
-          netW = this.opts.netWattsPerMBs * mbs
+          netW = estimateNetWatts(mbs, this.opts.netWattsPerMBs, MAX_NET_W)
         }
         this.prevNet = cur
       } catch {
@@ -415,4 +421,32 @@ function clamp01(x: number): number {
   if (x < 0) return 0
   if (x > 1) return 1
   return x
+}
+
+/** Estimate disk watts from throughput in MB/s (saturating model, capped). */
+export function estimateDiskWatts(
+  mbs: number,
+  idle = 3,
+  coefficient = 0.01,
+  max = MAX_DISK_W
+): number {
+  return Math.min(idle + coefficient * Math.max(0, mbs), max)
+}
+
+/** Estimate network watts from throughput in MB/s (saturating model, capped). */
+export function estimateNetWatts(
+  mbs: number,
+  coefficient = 0.03,
+  max = MAX_NET_W
+): number {
+  return Math.min(coefficient * Math.max(0, mbs), max)
+}
+
+/** Estimate RAM watts from used bytes (capped). */
+export function estimateRamWatts(
+  usedBytes: number,
+  per8GB = 3,
+  max = MAX_RAM_W
+): number {
+  return Math.min(per8GB * (usedBytes / (8 * 1024 ** 3)), max)
 }

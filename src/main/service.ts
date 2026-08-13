@@ -471,7 +471,9 @@ export class Service {
 
   private emitSample(s: Snapshot): void {
     const w = this.getWindow()
-    if (w && !w.isDestroyed()) w.webContents.send('wattprint:sample', s)
+    if (w && !w.isDestroyed() && w.isVisible()) {
+      w.webContents.send('wattprint:sample', s)
+    }
   }
 
   async getReadiness(): Promise<Readiness> {

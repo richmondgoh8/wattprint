@@ -34,6 +34,8 @@
 
   let sortKey = $state<'name' | 'cpuW' | 'gpuW' | 'w' | 'cpuPct' | 'memoryBytes'>('w');
   let sortDir = $state<'asc' | 'desc'>('desc');
+  let showAll = $state(false);
+  const TABLE_CAP = 100;
 
   function toggleSort(key: 'name' | 'cpuW' | 'gpuW' | 'w' | 'cpuPct' | 'memoryBytes') {
     const next = nextSort(sortKey, sortDir, key, ['name']);
@@ -58,6 +60,10 @@
     });
     return list;
   });
+
+  let displayProcesses = $derived(
+    showAll ? sortedProcesses : sortedProcesses.slice(0, TABLE_CAP)
+  );
 
   let memPct = $derived(
     (snapshot.latest?.memoryTotalBytes ?? 0) > 0
@@ -141,7 +147,7 @@
     <StatCard label="GPU" value={fmtW(snapshot.latest?.components.gpu ?? null)} sub={gpuSub} source={sources.gpu} hint="Power = measured ASIC power (LibreHardwareMonitor/ADL). Utilization = WDDM GPU engine sum, ~10s average (≈ Task Manager). Top consumer = largest WDDM GPU engine user. Neither metric is derived from the other." />
     <StatCard label="RAM" value={fmtW(snapshot.latest?.components.ram ?? 0)} source={sources.ram} hint="Estimated: ~3 W per 8 GB used" />
     <StatCard label="Disk" value={fmtW(snapshot.latest?.components.disk ?? 0)} source={sources.disk} hint="Estimated: idle + activity-based model" />
-    <StatCard label="Network" value={fmtW(snapshot.latest?.components.net ?? 0)} source={sources.net} hint="Estimated: 0.5 W per MB/s transferred" />
+    <StatCard label="Network" value={fmtW(snapshot.latest?.components.net ?? 0)} source={sources.net} hint="Estimated: ~0.03 W per MB/s transferred (capped at 12 W)" />
   </div>
 
   <div class="row">
@@ -191,7 +197,7 @@
             </tr>
           </thead>
           <tbody>
-            {#each sortedProcesses as p (p.pid)}
+            {#each displayProcesses as p (p.pid)}
               <tr>
                 <td class="name">{p.name || `pid ${p.pid}`}</td>
                 <td class="num">{fmtW(p.cpuW)}</td>
@@ -206,6 +212,15 @@
           </tbody>
         </table>
       </div>
+      {#if sortedProcesses.length > TABLE_CAP}
+        <div class="show-all-row">
+          {#if showAll}
+            <button class="show-all-btn" onclick={() => (showAll = false)}>Show top {TABLE_CAP} only</button>
+          {:else}
+            <button class="show-all-btn" onclick={() => (showAll = true)}>Show all {sortedProcesses.length} processes</button>
+          {/if}
+        </div>
+      {/if}
     {/if}
   </div>
 
@@ -236,8 +251,8 @@
         <li><strong>GPU</strong> — <em>measured</em>: ASIC power read from the driver (LibreHardwareMonitor / nvidia-smi / amd-smi). Typically within a few %.</li>
         <li><strong>CPU</strong> — <em>estimated</em>: reference TDP ({snapshot.latest?.cpuTdpW != null ? `${snapshot.latest.cpuTdpW} W` : 'unknown'}) × current load. Idle numbers are usually within ±20–30%.</li>
         <li><strong>RAM</strong> — <em>estimated</em>: ~3 W per 8 GB used.</li>
-        <li><strong>Disk</strong> — <em>estimated</em>: 3 W idle + 1 W per MB/s of activity.</li>
-        <li><strong>Network</strong> — <em>estimated</em>: 0.5 W per MB/s transferred.</li>
+        <li><strong>Disk</strong> — <em>estimated</em>: 3 W idle + ~0.01 W per MB/s of activity (capped at 15 W).</li>
+        <li><strong>Network</strong> — <em>estimated</em>: ~0.03 W per MB/s transferred (capped at 12 W).</li>
         <li><strong>Per-app watts</strong> — app shares are proportional to their CPU time (and GPU engine time), so an app's watts are approximate even when the component total is measured. GPU watts that no engine accounts for (idle GPU time) aren't assigned to any app.</li>
       </ul>
     </div>
@@ -372,4 +387,15 @@
   tbody tr:nth-child(even) { background: color-mix(in srgb, var(--bg-2) 25%, transparent); }
   tbody tr:hover { background: color-mix(in srgb, var(--bg-2) 55%, transparent); }
   tbody tr:last-child td { border-bottom: none; }
+  .show-all-row { text-align: center; padding-top: 8px; }
+  .show-all-btn {
+    background: none;
+    border: 1px solid var(--border-subtle);
+    color: var(--fg-2);
+    padding: 4px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .show-all-btn:hover { color: var(--fg-0); border-color: var(--border); }
 </style>
