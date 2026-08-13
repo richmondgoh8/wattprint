@@ -1,7 +1,7 @@
 # Wattprint Makefile
 # Convenience targets for common dev workflows.
 
-.PHONY: help install dev run build build-win build-linux build-mac typecheck check rebuild clean distclean release
+.PHONY: help install dev run build build-win build-linux typecheck check rebuild clean distclean release
 
 .DEFAULT_GOAL := help
 
@@ -28,9 +28,6 @@ build-win: ## Build a Windows portable .exe (uses electron-builder)
 
 build-linux: ## Build a Linux AppImage
 	npm run build:linux
-
-build-mac: ## Build a macOS dmg
-	npm run build:mac
 
 typecheck: ## Type-check main + preload + renderer
 	npm run typecheck

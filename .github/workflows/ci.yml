@@ -7,7 +7,7 @@ on:
 
 jobs:
   lint-test:
-    name: Typecheck & test
+    name: Typecheck & unit tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,11 +15,27 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
       - name: Install
         run: npm ci
 
-      - name: Rebuild native modules
-        run: npm run rebuild
+      - name: Unit tests
+        run: npm run test:unit
 
       - name: Typecheck
         run: npm run typecheck
@@ -29,3 +45,96 @@ jobs:
 
       - name: Build renderer
         run: npm run build
+
+  test-db:
+    name: Native DB tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install
+        run: npm ci
+
+      - name: DB tests
+        run: npm run test:db
+
+  package-windows:
+    name: Package Windows portable
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\npm-cache
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install
+        run: npm ci
+
+      - name: Package portable exe
+        run: npm run build:win
+
+  package-linux:
+    name: Package Linux AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install
+        run: npm ci
+
+      - name: Package AppImage
+        run: npm run build:linux

@@ -9,14 +9,12 @@ permissions:
   contents: write
 
 jobs:
-  build-windows:
-    name: Build Windows portable
-    runs-on: windows-latest
+  test:
+    name: Typecheck & unit tests
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Set up Node
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: '20'
 
@@ -27,16 +25,88 @@ jobs:
           key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
           restore-keys: ${{ runner.os }}-npm-
 
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install
+        run: npm ci
+
+      - name: Unit tests
+        run: npm run test:unit
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Frontend svelte-check
+        run: npm run check
+
+  test-db:
+    name: Native DB tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install
+        run: npm ci
+
+      - name: DB tests
+        run: npm run test:db
+
+  build-windows:
+    name: Build Windows portable
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~\AppData\Local\npm-cache
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
       - name: Install
         run: npm ci
 
       - name: Build
         run: npm run build:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: List output
-        run: dir dist
 
       - name: Compute SHA-256
         shell: bash
@@ -47,11 +117,79 @@ jobs:
           done
           cat *.sha256
 
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: |
+            dist/*.exe
+            dist/*.sha256
+
+  build-linux:
+    name: Build Linux AppImage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache npm
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-npm-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-npm-
+
+      - name: Cache electron binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: ${{ runner.os }}-electron-
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build:linux
+
+      - name: Compute SHA-256
+        shell: bash
+        run: |
+          cd dist
+          for f in *.AppImage; do
+            sha256sum "$f" > "$f.sha256"
+          done
+          cat *.sha256
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: |
+            dist/*.AppImage
+            dist/*.sha256
+
+  release:
+    name: Create draft release
+    needs: [test, test-db, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.exe
+            dist/*.AppImage
             dist/*.sha256
           draft: true
           generate_release_notes: true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

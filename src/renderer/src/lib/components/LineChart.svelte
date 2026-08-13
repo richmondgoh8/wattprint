@@ -12,19 +12,29 @@
     values: number[][];
     height?: number;
     yLabel?: string;
-    fill?: boolean;
   };
 
-  let { title, series, times, values, height = 240, yLabel = '', fill = true }: Props = $props();
+  let { title, series, times, values, height = 240, yLabel = '' }: Props = $props();
 
   let container: HTMLDivElement;
   let plot: uPlot | null = null;
   let resizeObserver: ResizeObserver | null = null;
+  let themeObserver: MutationObserver | null = null;
+
+  /** Resolve uPlot chrome colors from the active CSS theme. */
+  function chromeColors(): { fg: string; grid: string; tick: string } {
+    const css = getComputedStyle(document.documentElement);
+    const v = (name: string, fallback: string): string => css.getPropertyValue(name).trim() || fallback;
+    return { fg: v('--fg-2', '#68748a'), grid: v('--border', '#212a3a'), tick: v('--border-subtle', '#191f2b') };
+  }
 
   function build() {
     if (!container) return;
+    plot?.destroy();
+    plot = null;
     container.innerHTML = '';
     const data: uPlot.AlignedData = [times, ...values] as uPlot.AlignedData;
+    const { fg, grid, tick } = chromeColors();
     const opts: uPlot.Options = {
       width: container.clientWidth,
       height,
@@ -32,8 +42,8 @@
       cursor: { drag: { x: true, y: false } },
       scales: { x: { time: true } },
       axes: [
-        { stroke: '#7d8590', grid: { stroke: '#21262d' }, ticks: { stroke: '#30363d' } },
-        { stroke: '#7d8590', grid: { stroke: '#21262d' }, ticks: { stroke: '#30363d' }, label: yLabel },
+        { stroke: fg, grid: { stroke: grid }, ticks: { stroke: tick } },
+        { stroke: fg, grid: { stroke: grid }, ticks: { stroke: tick }, label: yLabel },
       ],
       series: [
         {},
@@ -41,7 +51,7 @@
           label: s.label,
           stroke: s.color,
           width: 2,
-          fill: fill ? `${s.color}22` : undefined,
+          fill: `${s.color}22`,
           points: { show: false },
           value: (_u, v) => (v == null ? '—' : v.toFixed(2)),
         })),
@@ -58,11 +68,15 @@
       }
     });
     resizeObserver.observe(container);
+    // Rebuild when the theme attribute flips so axis colors follow.
+    themeObserver = new MutationObserver(() => build());
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
   });
 
   onDestroy(() => {
     plot?.destroy();
     resizeObserver?.disconnect();
+    themeObserver?.disconnect();
   });
 
   $effect(() => {
@@ -76,11 +90,11 @@
 
 <div class="wrap">
   {#if title}<div class="title">{title}</div>{/if}
-  <div class="chart" bind:this={container} style="height: {height}px"></div>
+  <div class="chart" bind:this={container} style="height: {height}px" role="img" aria-label={title ? `${title} chart` : 'Chart'}></div>
 </div>
 
 <style>
-  .wrap { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .wrap { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
   .title { color: var(--fg-1); font-size: 13px; font-weight: 600; }
   .chart {
     background: var(--bg-1);
@@ -88,7 +102,10 @@
     border-radius: var(--radius);
     padding: 8px;
     min-width: 0;
+    animation: chart-in 240ms var(--ease-out);
   }
+  @keyframes chart-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+  @media (prefers-reduced-motion: reduce) { .chart { animation: none; } }
   :global(.u-legend) { color: var(--fg-1) !important; }
   :global(.u-legend .u-marker) { border-radius: 2px; }
 </style>

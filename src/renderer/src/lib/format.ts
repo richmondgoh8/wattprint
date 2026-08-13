@@ -13,6 +13,14 @@ export function fmtKWh(kwh: number, digits = 2): string {
   return `${kwh.toFixed(digits)} kWh`;
 }
 
+/** Energy with sub-kWh values shown in Wh so short windows don't read as ~0. */
+export function fmtEnergy(kwh: number, digits = 2): string {
+  if (!isFinite(kwh) || kwh < 0) return '—';
+  if (kwh >= 1000) return `${(kwh / 1000).toFixed(2)} MWh`;
+  if (kwh >= 1) return `${kwh.toFixed(digits)} kWh`;
+  return `${(kwh * 1000).toFixed(1)} Wh`;
+}
+
 export function fmtMoney(amount: number, currency: string, digits = 2): string {
   if (!isFinite(amount) || amount < 0) return '—';
   try {
@@ -26,27 +34,26 @@ export function fmtMoney(amount: number, currency: string, digits = 2): string {
   }
 }
 
-export function fmtCO2(kg: number, digits = 1): string {
-  if (!isFinite(kg) || kg < 0) return '—';
-  if (kg >= 1000) return `${(kg / 1000).toFixed(2)} t`;
-  return `${kg.toFixed(digits)} kg`;
-}
-
-export function fmtPercent(x: number, digits = 0): string {
-  if (!isFinite(x)) return '—';
-  return `${x.toFixed(digits)}%`;
-}
-
-export function fmtDate(d: Date | string): string {
-  const dd = typeof d === 'string' ? new Date(d) : d;
-  if (isNaN(dd.getTime())) return '—';
-  return dd.toLocaleString();
+export function fmtBytes(value: number | null | undefined): string {
+  if (value == null || !isFinite(value) || value <= 0) return '—';
+  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+  const exponent = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+  const scaled = value / 1024 ** exponent;
+  // One decimal for small values so e.g. 1.5 KB doesn't read as "2 KB".
+  const digits = scaled < 10 ? 1 : 0;
+  return `${scaled.toFixed(digits)} ${units[exponent]}`;
 }
 
 export function fmtTime(d: Date | string): string {
   const dd = typeof d === 'string' ? new Date(d) : d;
   if (isNaN(dd.getTime())) return '—';
   return dd.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+export function fmtDate(d: Date | string): string {
+  const dd = typeof d === 'string' ? new Date(d) : d;
+  if (isNaN(dd.getTime())) return '—';
+  return dd.toLocaleDateString([], { month: 'short', day: 'numeric' });
 }
 
 export function fmtDuration(hours: number): string {

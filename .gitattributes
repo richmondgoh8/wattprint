@@ -1,0 +1,33 @@
+# Normalize line endings; check out per-platform
+* text=auto eol=lf
+
+# Text files
+*.ts text eol=lf
+*.svelte text eol=lf
+*.js text eol=lf
+*.mjs text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.sh text eol=lf
+*.ps1 text eol=lf
+*.mjs text eol=lf
+
+# Binaries — never diff or normalize
+*.dll binary
+*.node binary
+*.ico binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.db binary
+*.db-shm binary
+*.db-wal binary

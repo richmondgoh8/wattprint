@@ -7,7 +7,13 @@ directories:
 files:
   - out/**/*
   - package.json
+extraResources:
+  - from: resources/lhm
+    to: lhm
+  - from: resources/tray.ico
+    to: tray.ico
 asar: true
+npmRebuild: false
 win:
   target:
     - target: portable
@@ -17,17 +23,6 @@ win:
   requestedExecutionLevel: asInvoker
 portable:
   artifactName: ${productName}-${version}-portable.exe
-nsis:
-  oneClick: false
-  perMachine: false
-  allowToChangeInstallationDirectory: true
-  artifactName: ${productName}-${version}-setup.${ext}
-mac:
-  target:
-    - target: dmg
-      arch: [x64, arm64]
-  icon: build/icon.png
-  category: public.app-category.utilities
 linux:
   target:
     - target: AppImage

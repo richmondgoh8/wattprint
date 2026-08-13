@@ -11,14 +11,14 @@ Thumbs.db
 .env
 .env.*
 
-# OS
-.DS_Store
+# Playwright session artifacts
+.playwright-cli/
 
 # Wattprint runtime data (do not commit)
 *.db
 *.db-shm
 *.db-wal
 
-# Build output
-out/
-release/
+# Test coverage + TypeScript build info
+coverage/
+*.tsbuildinfo

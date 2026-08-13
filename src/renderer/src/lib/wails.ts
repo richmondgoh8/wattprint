@@ -4,10 +4,16 @@
 import type {
   Snapshot,
   KeyTotal,
-  HourlyRollup,
   ForecastResult,
   Settings,
   SystemInfo,
+  Readiness,
+  MachineStateRow,
+  Insights,
+  SourceKind,
+  SleepSession,
+  Benchmark,
+  TrackingInfo,
   WattprintAPI
 } from '../../../shared/types.js'
 
@@ -21,10 +27,16 @@ declare global {
 export type {
   Snapshot,
   KeyTotal,
-  HourlyRollup,
   ForecastResult,
   Settings,
-  SystemInfo
+  SystemInfo,
+  Readiness,
+  MachineStateRow,
+  Insights,
+  SourceKind,
+  SleepSession,
+  Benchmark,
+  TrackingInfo
 } from '../../../shared/types.js'
 
 function api() {
@@ -32,17 +44,37 @@ function api() {
 }
 
 export const start = (): Promise<void> => api().start()
+export const resetStatistics = (): Promise<void> => api().resetStatistics()
 export const getSettings = (): Promise<Settings> => api().getSettings()
-export const updateSettings = (s: Settings): Promise<void> => api().updateSettings(s)
+
+/** Deep-copy to plain JSON-safe objects. Svelte 5 $state values are Proxies,
+ *  which Electron's structured clone cannot serialize (DataCloneError). */
+export function deepPlain<T>(value: T): T {
+  return value == null ? value : (JSON.parse(JSON.stringify(value)) as T)
+}
+
+export const updateSettings = (s: Partial<Settings>): Promise<Settings> => api().updateSettings(deepPlain(s))
 export const getSystemInfo = (): Promise<SystemInfo> => api().getSystemInfo()
+export const getReadiness = (): Promise<Readiness> => api().getReadiness()
 
 export const viewTotals = (from: Date, to: Date, scope: string): Promise<KeyTotal[]> =>
   api().viewTotals(from.toISOString(), to.toISOString(), scope)
 
-export const viewHourly = (from: Date, to: Date, scope: string, key: string): Promise<HourlyRollup[]> =>
-  api().viewHourly(from.toISOString(), to.toISOString(), scope, key)
-
 export const viewForecast = (): Promise<ForecastResult> => api().viewForecast()
+
+export const viewMachineStates = (from: Date, to: Date): Promise<MachineStateRow[]> =>
+  api().viewMachineStates(from.toISOString(), to.toISOString())
+
+export const getInsights = (): Promise<Insights> => api().getInsights()
+
+export const getTrackingInfo = (fromIso?: string | null): Promise<TrackingInfo> => api().getTrackingInfo(fromIso)
+
+export const getBenchmark = (): Promise<Benchmark> => api().getBenchmark()
+
+export const getSleepSessions = (from: Date, to: Date): Promise<SleepSession[]> =>
+  api().getSleepSessions(from.toISOString(), to.toISOString())
+
+export const setSleepMode = (on: boolean): Promise<void> => api().setSleepMode(on)
 
 export const onSample = (cb: (s: Snapshot) => void): (() => void) => api().onSample(cb)
 export const onStatus = (cb: (s: string) => void): (() => void) => api().onStatus(cb)
